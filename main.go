@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	version         = "0.0.1"
+	version         = "0.0.2"
 	actionAbandon   = "ABANDON"
 	actionHeartBeat = "HEARTBEAT"
 	actionContinue  = "CONTINUE"
@@ -38,6 +38,7 @@ func main() {
 	validateActions()
 
 	// Do the work
+	run()
 }
 
 func showStopperFlags() {
@@ -55,7 +56,7 @@ func showStopperFlags() {
 
 func validateActions() {
 	errors := []string{}
-	if err := validateHookAction(); err != nil {
+	if err := validateHookAction(*hookActionFlag); err != nil {
 		errors = append(errors, err.Error())
 	}
 	if err := validateRequiredVars(); err != nil {
@@ -67,12 +68,12 @@ func validateActions() {
 	}
 }
 
-func validateHookAction() error {
-	if *hookActionFlag == "" {
+func validateHookAction(hookAction string) error {
+	if hookAction == "" {
 		return fmt.Errorf("-a must to be specified")
 	}
 	hookActionValid := false
-	switch *hookActionFlag {
+	switch hookAction {
 	case actionAbandon:
 		hookActionValid = true
 	case actionHeartBeat:
@@ -80,8 +81,8 @@ func validateHookAction() error {
 	case actionContinue:
 		hookActionValid = true
 	}
-	if hookActionValid {
-		return fmt.Errorf("Hook action %s is not valid", *hookActionFlag)
+	if !hookActionValid {
+		return fmt.Errorf("Hook action %s is not valid", hookAction)
 	}
 
 	return nil
