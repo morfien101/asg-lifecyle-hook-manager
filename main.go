@@ -3,13 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/morfien101/asg-lifecyle-hook-manager/hookmanager"
 	"os"
 	"strings"
+
+	"github.com/morfien101/asg-lifecyle-hook-manager/ec2metadatareader"
+	"github.com/morfien101/asg-lifecyle-hook-manager/hookmanager"
 )
 
 var (
-	version         = "0.0.2"
+	version         = "0.0.3"
 	actionAbandon   = "ABANDON"
 	actionHeartBeat = "HEARTBEAT"
 	actionContinue  = "CONTINUE"
@@ -27,7 +29,7 @@ var (
 	verboseFlag    = flag.Bool("verbose", false, "Will log success statements as well as errors")
 	asgNameFlag    = flag.String("n", "", "Name of the autoscaling group")
 	hookNameFlag   = flag.String("l", "", "Name of the Lifecycle hook")
-	instanceIDFlag = flag.String("i", "", "instance_id for the EC2 instance")
+	instanceIDFlag = flag.String("i", "", "instance_id for the EC2 instance. If - is passed the instance ID is determined automatically from the metadata if available")
 	hookActionFlag = flag.String("a", "", fmt.Sprintf("Set the lifecycle hook action. Valid values: %s, %s, %s", actionAbandon, actionContinue, actionHeartBeat))
 )
 
@@ -107,9 +109,21 @@ func validateRequiredVars() error {
 }
 
 func run() {
+	instanceID := ""
+	if *instanceIDFlag == "-" {
+		localInstanceID, err := ec2metadatareader.InstanceID()
+		if err != nil {
+			writeToStdErr(fmt.Sprintf("Could not determine instance id. Error: %s", err))
+			os.Exit(1)
+		}
+		instanceID = localInstanceID
+	} else {
+		instanceID = *instanceIDFlag
+	}
+
 	switch *hookActionFlag {
 	case actionAbandon:
-		output, err := hookmanager.SetAbandon(*asgNameFlag, *hookNameFlag, *instanceIDFlag)
+		output, err := hookmanager.SetAbandon(*asgNameFlag, *hookNameFlag, instanceID)
 		if err != nil {
 			terminate(err.Error(), 1)
 			return
@@ -117,7 +131,7 @@ func run() {
 		terminate(output, 0)
 
 	case actionContinue:
-		output, err := hookmanager.SetContinue(*asgNameFlag, *hookNameFlag, *instanceIDFlag)
+		output, err := hookmanager.SetContinue(*asgNameFlag, *hookNameFlag, instanceID)
 		if err != nil {
 			terminate(err.Error(), 1)
 			return
@@ -125,7 +139,7 @@ func run() {
 		terminate(output, 0)
 
 	case actionHeartBeat:
-		output, err := hookmanager.RecordHeartBeat(*asgNameFlag, *hookNameFlag, *instanceIDFlag)
+		output, err := hookmanager.RecordHeartBeat(*asgNameFlag, *hookNameFlag, instanceID)
 		if err != nil {
 			terminate(err.Error(), 1)
 			return
@@ -136,12 +150,19 @@ func run() {
 
 func terminate(log string, exitCode int) {
 	if exitCode == 0 {
-		// Log success only if required
-		if *verboseFlag {
-			fmt.Println(log)
-		}
+		verboseLog(log)
 	} else {
-		fmt.Println(log)
+		writeToStdErr(log)
 	}
 	os.Exit(exitCode)
+}
+
+func writeToStdErr(s string) {
+	fmt.Fprintln(os.Stderr, s)
+}
+
+func verboseLog(s string) {
+	if *verboseFlag {
+		fmt.Println(s)
+	}
 }
