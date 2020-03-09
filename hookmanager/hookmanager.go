@@ -2,15 +2,25 @@ package hookmanager
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/morfien101/asg-lifecyle-hook-manager/ec2metadatareader"
 )
 
 func awsSession() (*session.Session, error) {
-	return session.NewSession()
+	region, ok := os.LookupEnv("AWS_REGION")
+	if !ok {
+		guess, err := ec2metadatareader.Region()
+		if err != nil {
+			return nil, err
+		}
+		region = guess
+	}
+	return session.NewSession(&aws.Config{Region: aws.String(region)})
 }
 func asgSession(session *session.Session) *autoscaling.AutoScaling {
 	return autoscaling.New(session)
